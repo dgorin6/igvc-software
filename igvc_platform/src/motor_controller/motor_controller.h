@@ -45,6 +45,7 @@ private:
 
   // publishers
   ros::Publisher enc_pub_;
+  ros::Publisher requested_pub_;
   ros::Publisher enabled_pub_;
   ros::Publisher battery_pub_;
 

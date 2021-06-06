@@ -43,7 +43,7 @@
 
     <node name="slam" pkg="igvc_perception" type="slam" output="screen">
         <!-- Needs to be updated for each location: https://www.ngdc.noaa.gov/geomag/calculators/magcalc.shtml -->
-        <param name="localMagneticField" value="[0.0000227095, 0.0000020783, -0.0000432753]" />
+        <param name="localMagneticField" value="[0.0000179159, -0.0000024742, 0.0000511873]" />
         <param name="magNoiseConstant" value="0.00000005" />
         <remap from="/slam/position" to="/odometry/filtered"/>
     </node>
