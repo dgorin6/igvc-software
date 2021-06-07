@@ -19,8 +19,19 @@ NavigationClient::NavigationClient()
   back_circle_response_pub_ = nh_.advertise<igvc_msgs::BackCircleResponse>("/back_circle_response", 1);
 
   back_circle_client = nh_.serviceClient<igvc_msgs::BackCircle>("/back_circle_service");
+  gps_sub_ = nh_.subscribe("/fix", 1, &NavigationClient::gpsCallback, this);
 
-  waitForTransform();
+//  waitForTransform();
+
+    while (ros::ok)
+    {
+        ros::spinOnce();
+        if (gpsInit) {
+            // once we have initial gps we dont need subscriber
+            gps_sub_.shutdown();
+            break;
+        }
+    }
   waitForServer();
 
   if (reading_from_file_)
@@ -135,14 +146,22 @@ std::vector<LatLong> NavigationClient::parseWaypointFile()
 
 geometry_msgs::PointStamped NavigationClient::convertLatLongToOdom(LatLong lat_long)
 {
-  geometry_msgs::PointStamped waypoint_utm;
-  RobotLocalization::NavsatConversions::UTM(lat_long.latitude, lat_long.longitude, &(waypoint_utm.point.x),
-                                            &(waypoint_utm.point.y));
-  waypoint_utm.header.frame_id = "utm";
+    double E, N, U;
+    origin_ENU.Forward(lat_long.latitude, lat_long.longitude, 0, E, N, U);
+//    ROS_INFO_STREAM("gps measurement: " << E << ", " << N);
+//  geometry_msgs::PointStamped waypoint_utm;
+//  RobotLocalization::NavsatConversions::UTM(lat_long.latitude, lat_long.longitude, &(waypoint_utm.point.x),
+//                                            &(waypoint_utm.point.y));
+//  waypoint_utm.header.frame_id = "utm";
 
   // transform utm frame to odom frame
   geometry_msgs::PointStamped waypoint_odom;
-  tf_listener_.transformPoint("odom", ros::Time(0), waypoint_utm, "odom", waypoint_odom);
+  waypoint_odom.point.x = E;
+  waypoint_odom.point.y = N;
+  waypoint_odom.header.stamp = ros::Time::now();
+  waypoint_odom.header.frame_id = "odom";
+
+//  tf_listener_.transformPoint("odom", ros::Time(0), waypoint_utm, "odom", waypoint_odom);
   return waypoint_odom;
 }
 
@@ -249,6 +268,20 @@ void NavigationClient::rvizWaypointCallback(const geometry_msgs::PoseStamped& po
   {
     sendGoal(pose, false);
   }
+}
+
+void NavigationClient::gpsCallback(const sensor_msgs::NavSatFixConstPtr &gps)
+{
+    // get the starting location as the origin
+    double lat, lon, h;
+    lat = gps->latitude;
+    lon = gps->longitude;
+    h = gps->altitude;
+    if (!gpsInit)
+    {
+        origin_ENU = GeographicLib::LocalCartesian(lat, lon, h, GeographicLib::Geocentric::WGS84());
+        gpsInit = true;
+    }
 }
 
 int main(int argc, char** argv)

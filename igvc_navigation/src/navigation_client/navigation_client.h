@@ -14,6 +14,11 @@
 #include <geometry_msgs/PointStamped.h>
 #include <geometry_msgs/PoseStamped.h>
 #include <nav_msgs/Odometry.h>
+#include <sensor_msgs/NavSatFix.h>
+
+// Convert between geodetic coordinates to local cartesian coordinates
+#include <GeographicLib/Config.h>
+#include <GeographicLib/LocalCartesian.hpp>
 
 using MoveBaseClient = actionlib::SimpleActionClient<igvc_msgs::NavigateWaypointAction>;
 
@@ -29,6 +34,7 @@ public:
   NavigationClient();
   ros::NodeHandle nh_;
   ros::Subscriber rviz_sub_;
+  ros::Subscriber gps_sub_;
   tf::TransformListener tf_listener_;
 
 private:
@@ -40,6 +46,12 @@ private:
   ros::Publisher back_circle_response_pub_;
 
   // params
+  // GPS
+  bool gpsInit = false;
+  GeographicLib::LocalCartesian origin_ENU;
+
+
+    // params
   bool reading_from_file_;          // true if reading from waypoint file, false if from rviz
   std::string waypoint_file_path_;  // path to waypoint file
 
@@ -113,6 +125,13 @@ private:
   @param[in]
   */
   void rvizWaypointCallback(const geometry_msgs::PoseStamped& pose);
+
+    /**
+    (ROS Callback) gets initial gps coordinate at (0,0) and then shuts down
+
+    @param[in]
+    */
+  void gpsCallback(const sensor_msgs::NavSatFixConstPtr& gps);
 };
 
 #endif  // SRC_NAVIGATION_CLIENT_H
