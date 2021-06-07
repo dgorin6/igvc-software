@@ -2,13 +2,10 @@
     <arg name="read_from_file" default="true"/>
 
     <!-- Localization -->
-    <include file="$(find igvc_navigation)/launch/localization.launch" />
+    <include file="$(find igvc_perception)/launch/slam.launch" />
 
     <!-- Launch navigation (simulation version) -->
     <include file="$(find igvc_navigation)/launch/mbf_navigation.launch" />
-
-    <!-- Launch back circle service server -->
-    <include file="$(find igvc_navigation)/launch/back_circle_server.launch"/>
 
     <!-- Launch navigation server -->
     <include file="$(find igvc_navigation)/launch/navigation_server.launch"/>

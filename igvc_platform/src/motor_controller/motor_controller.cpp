@@ -21,6 +21,7 @@ MotorController::MotorController(ros::NodeHandle* nodehandle) : nh_(*nodehandle)
 
   // initialize publishers to publish mbed stats
   enc_pub_ = nh_.advertise<igvc_msgs::velocity_pair>("/encoders", 1000);
+  requested_pub_ = nh_.advertise<igvc_msgs::velocity_pair>("/requested_vel", 1);
   enabled_pub_ = nh_.advertise<std_msgs::Bool>("/robot_enabled", 1);
   battery_pub_ = nh_.advertise<std_msgs::Float64>("/battery", 1);
 
@@ -317,6 +318,11 @@ void MotorController::publishResponse(const ResponseMessage& response)
   enc_msg.duration = response.dt_sec;
   enc_msg.header.stamp = ros::Time::now() - ros::Duration(response.dt_sec);
   enc_pub_.publish(enc_msg);
+
+  igvc_msgs::velocity_pair desired_speeds;
+  desired_speeds.left_velocity = response.desired_speed_l;
+  desired_speeds.right_velocity = response.desired_speed_r;
+  requested_pub_.publish(desired_speeds);
 }
 
 int main(int argc, char** argv)

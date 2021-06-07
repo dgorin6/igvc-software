@@ -1,17 +1,23 @@
-#include <parameter_assertions/assertions.h>
-#include <ros/ros.h>
-#include <opencv2/opencv.hpp>
-#include <opencv2/core/mat.hpp>
-#include <igvc_msgs/BackCircle.h>
-#include <pcl/point_cloud.h>
-#include <pcl_ros/point_cloud.h>
-#include <pcl_ros/transforms.h>
-#include <nav_msgs/Odometry.h>
-#include <tf/transform_listener.h>
+#include "back_circle_server.h"
 
-tf::TransformListener listener;
+BackCircleServer::BackCircleServer()
+{
+  back_circle_service_server_ =
+      nh_.advertiseService("/back_circle_service", &BackCircleServer::backCircleCallback, this);
+  ROS_INFO("Back Circle Service Ready");
+}
 
-bool backCircleCallback(igvc_msgs::BackCircle::Request &req, igvc_msgs::BackCircle::Response &res)
+void BackCircleServer::waitForTransform()
+{
+  const double waiting_time = 5.0;
+  while (!tf_listener_.waitForTransform("odom", "base_footprint", ros::Time::now(), ros::Duration(waiting_time)))
+  {
+    ROS_INFO_STREAM("base_footprint->odom transform not found. waiting...");
+  }
+  ROS_INFO_STREAM("base_footprint->odom transform found!");
+}
+
+bool BackCircleServer::backCircleCallback(igvc_msgs::BackCircle::Request &req, igvc_msgs::BackCircle::Response &res)
 {
   ros::NodeHandle pNh("~");
 
@@ -25,15 +31,13 @@ bool backCircleCallback(igvc_msgs::BackCircle::Request &req, igvc_msgs::BackCirc
   assertions::getParam(pNh, std::string("offset"), offset);
   double meters = (length + width) * 2;
 
-  using namespace cv;
-
   int img_size = static_cast<int>(std::round(meters / grid_size));
-  Mat img(img_size, img_size, CV_8U, Scalar::all(0));
-  ellipse(img, Point(img_size / 2, img_size / 2), Size(width / grid_size, length / grid_size), 0, 90, 270, Scalar(255),
-          static_cast<int>(std::round(thickness / grid_size)));
+  cv::Mat img(img_size, img_size, CV_8U, cv::Scalar::all(0));
+  cv::ellipse(img, cv::Point(img_size / 2, img_size / 2), cv::Size(width / grid_size, length / grid_size), 0, 90, 270,
+              cv::Scalar(255), static_cast<int>(std::round(thickness / grid_size)));
 
   pcl::PointCloud<pcl::PointXYZ> back_circle_pointcloud_base_footprint;
-  back_circle_pointcloud_base_footprint.header.stamp = ros::Time::now().toSec();
+  back_circle_pointcloud_base_footprint.header.stamp = ros::Time::now().toNSec() / 1000;
   back_circle_pointcloud_base_footprint.header.frame_id = "/base_footprint";
 
   for (int i = 0; i < img.rows; i++)
@@ -48,8 +52,10 @@ bool backCircleCallback(igvc_msgs::BackCircle::Request &req, igvc_msgs::BackCirc
     }
   }
 
+  waitForTransform();
   pcl::PointCloud<pcl::PointXYZ> back_circle_pointcloud_odom;
-  pcl_ros::transformPointCloud("odom", back_circle_pointcloud_base_footprint, back_circle_pointcloud_odom, listener);
+  pcl_ros::transformPointCloud("odom", ros::Time::now(), back_circle_pointcloud_base_footprint, "odom",
+                               back_circle_pointcloud_odom, tf_listener_);
 
   for (size_t i = 0; i < back_circle_pointcloud_odom.points.size(); ++i)
   {
@@ -62,7 +68,7 @@ bool backCircleCallback(igvc_msgs::BackCircle::Request &req, igvc_msgs::BackCirc
   res.y = yVec;
   res.z = zVec;
 
-  ROS_INFO("Confirmation");
+  ROS_INFO("Back circle points created.");
 
   return true;
 }
@@ -70,15 +76,7 @@ bool backCircleCallback(igvc_msgs::BackCircle::Request &req, igvc_msgs::BackCirc
 int main(int argc, char **argv)
 {
   ros::init(argc, argv, "back_circle");
-
-  ros::NodeHandle nh;
-
-  ros::ServiceServer service = nh.advertiseService("/back_circle_service", backCircleCallback);
-  ROS_INFO("Back Circle Service Ready");
-
-  // ros::Publisher pub = nh.advertise<pcl::PointCloud<pcl::PointXYZ>>("/back_circle_layer", 1);
-  // pub.publish(back_circle_pointcloud);
-
+  BackCircleServer node = BackCircleServer();
   ros::spin();
   return 0;
 }
